@@ -250,8 +250,8 @@ def identify2d(fs=None):
         iraf.flpr()
         iraf.specidentify(images=f, linelist=lamplines, outfile=idfile,
                           guesstype='rss', inter=True, # automethod='FitXcor',
-                          rstep=600 / ccdsum,
-                          rstart=200 / ccdsum, startext=1, clobber='yes',
+                          rstep= -1720 / ccdsum,
+                          rstart=2000 / ccdsum, startext=1, clobber='yes',
                           #startext=1, clobber='yes',
                           verbose='no', mode='hl', logfile='salt.log',
                           mdiff=2, function='legendre')
