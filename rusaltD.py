@@ -51,7 +51,8 @@ def load_modules():
     from scipy import optimize
     
     global ds9
-    import pyds9 as ds9
+#    import pyds9 as ds9
+    import ds9
     
     global GaussianProcess
     from sklearn.gaussian_process import GaussianProcess
@@ -66,7 +67,8 @@ def load_modules():
     iraf.imutil()
 
 # System specific path to pysalt
-pysaltpath = '/iraf/extern/pysalt'
+# pysaltpath = '/iraf/extern/pysalt'
+pysaltpath = '/usr/local/astro64/iraf/extern/pysalt'
 
 # Define the stages
 allstages = ['sorting',
@@ -278,11 +280,11 @@ def get_chipgaps(hdu):
 
         # Note we also grow the chip gap by 1 pixel on each side
         # Chip 1
-        chipgap1 = (np.min(w[w > 950]) - 1, np.max(w[w < 1100]) + 1)
+        chipgap1 = (np.min(w[w > 700]) - 1, np.max(w[w < 1300]) + 1)
         # Chip 2
-        chipgap2 = (np.min(w[w > 2050]) - 1, np.max(w[w < 2250]) + 1)
+        chipgap2 = (np.min(w[w > 1750]) - 1, np.max(w[w < 2350]) + 1)
         # edge of chip 3=
-        chipgap3 = (np.min(w[w > 3100]) - 1, hdu[2].data.shape[1] + 1)
+        chipgap3 = (np.min(w[w > 2900]) - 1, hdu[2].data.shape[1] + 1)
         return (chipgap1, chipgap2, chipgap3)
 
 
@@ -338,6 +340,8 @@ def rectify(ids=None, fs=None):
         # To deal with this we just throw away the min and max of each side of
         # the curved chip gap
         chipgaps = get_chipgaps(h)
+        print (" -- chipgaps --")
+        print (chipgaps)
 
         # Chip 1
         h[2].data[:, chipgaps[0][0]:chipgaps[0][1]] = 1
@@ -685,9 +689,9 @@ def stdsensfunc(fs=None):
             extfile = pysaltpath + '/data/site/suth_extinct.dat'
             iraf.unlearn(iraf.specsens)
             iraf.specsens(asciispec, outfile, stdfile, extfile,
-                          airmass=pyfits.getval(f, 'AIRMASS'),
+                          airmass=pyfits.getval(f, 'AIRMASS'), fitter='gaussian',
                           exptime=pyfits.getval(f, 'EXPTIME'), function='poly',
-                          order=11, clobber=True, mode='h', thresh=1e10)
+                          order=3, niter=3, clobber=True, mode='h', thresh=10)
             # delete the ascii file
             S= np.genfromtxt(outfile,skip_header=40,skip_footer=40)
             np.savetxt(outfile,S)
