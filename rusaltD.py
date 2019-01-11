@@ -573,7 +573,7 @@ def extract(fs=None):
                    b_low_reject=3.0, b_high_reject=3.0, nfind=1, t_nsum=15,
                    t_step=15, t_nlost=200, t_function='legendre', t_order=5,
                    t_niterate=5, t_low_reject=3.0, t_high_reject=3.0,
-                   background='fit', weights='variance', pfit='fit1d',
+                   background='fit', weights='variance', pfit='fit2d',
                    clean='no', readnoise=readnoise, gain=1.0, lsigma=4.0,
                    usigma=4.0, mode='hl')
 
