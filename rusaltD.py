@@ -65,6 +65,7 @@ def load_modules():
     iraf.longslit()
     iraf.apextract()
     iraf.imutil()
+    iraf.rvsao(motd='no')
 
 # System specific path to pysalt
 # pysaltpath = '/iraf/extern/pysalt'
@@ -144,7 +145,9 @@ def sorting(fs=None):
     if fs is None:
         fs = glob('mbxgpP*.fits')
     if len(fs) == 0:
-        print "WARNING: No raw files to run PySALT pre-processing."
+        fs = glob('mbxpP*.fits')
+    if len(fs) == 0:
+        print "WARNING: No product files to run PySALT pre-processing."
         return
 
     # Copy the raw files into a raw directory
@@ -937,14 +940,28 @@ def speccombine(fs=None):
     #   we assume there is a c1.fits file for each image
     c1fs = [f for f in fs if 'c1.fits' in f]
     avgjd = np.mean([pyfits.getval(f,'JD') for f in c1fs])
-    pyfits.setval(combfile,'JD',value=avgjd)
+    pyfits.setval(combfile,'JD',value=avgjd,comment='average of multiple exposures')
     print "average JD = " + str(avgjd)
     sumet = np.sum([pyfits.getval(f,'EXPTIME') for f in c1fs])
-    pyfits.setval(combfile,'EXPTIME',value=sumet)
+    pyfits.setval(combfile,'EXPTIME',value=sumet,comment='sum of multiple exposures')
     print "total EXPTIME = " + str(sumet)
     avgam = np.mean([pyfits.getval(f,'AIRMASS') for f in c1fs])
-    pyfits.setval(combfile,'AIRMASS',value=avgam)
+    pyfits.setval(combfile,'AIRMASS',value=avgam,comment='average of multiple exposures')
     print "avg AIRMASS = " + str(avgam)
+
+    # update this to used avg jd midpoint of all exposures? 
+    print "barycentric velocity correction (km/s) = ", 
+    iraf.bcvcorr(spectra=combfile,keytime='UTC-OBS',keywhen='mid',
+                 obslong="339:11:16.8",obslat="-32:22:46.2",obsalt='1798',obsname='saao', 
+                 savebcv='yes',savejd='yes',printmode=2)
+    pyfits.setval(combfile,'UTMID',comment='added by RVSAO task BCVCORR')
+    pyfits.setval(combfile,'GJDN',comment='added by RVSAO task BCVCORR')
+    pyfits.setval(combfile,'HJDN',comment='added by RVSAO task BCVCORR')
+    pyfits.setval(combfile,'BCV',comment='added by RVSAO task BCVCORR (km/s)')
+    pyfits.setval(combfile,'HCV',comment='added by RVSAO task BCVCORR (km/s)')
+    iraf.dopcor(input=combfile,output='',redshift=-iraf.bcvcorr.bcv,isvelocity='yes',
+                add='no',dispersion='yes',flux='no',verbose='yes')
+    pyfits.setval(combfile,'DOPCOR01',comment='barycentric velocity correction applied')
 
     iraf.cd('..')
 
