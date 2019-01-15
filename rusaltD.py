@@ -573,7 +573,7 @@ def extract(fs=None):
                    b_low_reject=3.0, b_high_reject=3.0, nfind=1, t_nsum=15,
                    t_step=15, t_nlost=200, t_function='legendre', t_order=5,
                    t_niterate=5, t_low_reject=3.0, t_high_reject=3.0,
-                   background='fit', weights='variance', pfit='fit2d',
+                   background='fit', weights='variance', pfit='fit1d',
                    clean='no', readnoise=readnoise, gain=1.0, lsigma=4.0,
                    usigma=4.0, mode='hl')
 
@@ -970,8 +970,9 @@ def speccombine(fs=None):
 # These numbers were taken directly from Tom Matheson's Cal code from Jeff
 # Silverman
 #telluricWaves = {'B': (6855, 6935), 'A': (7590, 7685)}
-telluricWaves = [(2000., 3190.), (3216., 3420.), (5500., 6050.), (6250., 6360.),
-                 (6450., 6530.), (6840., 7410.), (7560., 8410.), (8800., 9900.)]
+#telluricWaves = [(2000., 3190.), (3216., 3420.), (5500., 6050.), (6250., 6360.),
+#                 (6450., 6530.), (6840., 7410.), (7560., 8410.), (8800., 9900.)]
+telluricWaves = [(6250., 6360.), (6450., 6530.), (6855., 7400.), (7580., 7720.)]
 
 
 def fitshdr_to_wave(hdr):
