@@ -51,7 +51,8 @@ def load_modules():
     from scipy import optimize
     
     global ds9
-    import pyds9 as ds9
+#    import pyds9 as ds9
+    import ds9
     
     global GaussianProcess
     from sklearn.gaussian_process import GaussianProcess
@@ -64,9 +65,11 @@ def load_modules():
     iraf.longslit()
     iraf.apextract()
     iraf.imutil()
+    iraf.rvsao(motd='no')
 
 # System specific path to pysalt
-pysaltpath = '/iraf/extern/pysalt'
+# pysaltpath = '/iraf/extern/pysalt'
+pysaltpath = '/usr/local/astro64/iraf/extern/pysalt'
 
 # Define the stages
 allstages = ['sorting',
@@ -142,7 +145,9 @@ def sorting(fs=None):
     if fs is None:
         fs = glob('mbxgpP*.fits')
     if len(fs) == 0:
-        print "WARNING: No raw files to run PySALT pre-processing."
+        fs = glob('mbxpP*.fits')
+    if len(fs) == 0:
+        print "WARNING: No product files to run PySALT pre-processing."
         return
 
     # Copy the raw files into a raw directory
@@ -278,11 +283,11 @@ def get_chipgaps(hdu):
 
         # Note we also grow the chip gap by 1 pixel on each side
         # Chip 1
-        chipgap1 = (np.min(w[w > 950]) - 1, np.max(w[w < 1100]) + 1)
+        chipgap1 = (np.min(w[w > 700]) - 1, np.max(w[w < 1300]) + 1)
         # Chip 2
-        chipgap2 = (np.min(w[w > 2050]) - 1, np.max(w[w < 2250]) + 1)
+        chipgap2 = (np.min(w[w > 1750]) - 1, np.max(w[w < 2350]) + 1)
         # edge of chip 3=
-        chipgap3 = (np.min(w[w > 3100]) - 1, hdu[2].data.shape[1] + 1)
+        chipgap3 = (np.min(w[w > 2900]) - 1, hdu[2].data.shape[1] + 1)
         return (chipgap1, chipgap2, chipgap3)
 
 
@@ -338,6 +343,8 @@ def rectify(ids=None, fs=None):
         # To deal with this we just throw away the min and max of each side of
         # the curved chip gap
         chipgaps = get_chipgaps(h)
+        print (" -- chipgaps --")
+        print (chipgaps)
 
         # Chip 1
         h[2].data[:, chipgaps[0][0]:chipgaps[0][1]] = 1
@@ -685,9 +692,9 @@ def stdsensfunc(fs=None):
             extfile = pysaltpath + '/data/site/suth_extinct.dat'
             iraf.unlearn(iraf.specsens)
             iraf.specsens(asciispec, outfile, stdfile, extfile,
-                          airmass=pyfits.getval(f, 'AIRMASS'),
+                          airmass=pyfits.getval(f, 'AIRMASS'), fitter='gaussian',
                           exptime=pyfits.getval(f, 'EXPTIME'), function='poly',
-                          order=11, clobber=True, mode='h', thresh=1e10)
+                          order=3, niter=3, clobber=True, mode='h', thresh=10)
             # delete the ascii file
             S= np.genfromtxt(outfile,skip_header=40,skip_footer=40)
             np.savetxt(outfile,S)
@@ -718,7 +725,7 @@ def fluxcal(stdsfolder='./', fs=None):
         # Get the standard sensfunc with the same grating angle
         stdfile = None
         for stdf in stdfiles:
-            if ga in stdf:
+            if np.isclose(float(ga),float(stdf.split('/')[stdf.count('/')][3:8]),rtol=1e-2):
                 # Get the right chip number
                 if chip == stdf[-5]:
                     stdfile = stdf
@@ -933,14 +940,28 @@ def speccombine(fs=None):
     #   we assume there is a c1.fits file for each image
     c1fs = [f for f in fs if 'c1.fits' in f]
     avgjd = np.mean([pyfits.getval(f,'JD') for f in c1fs])
-    pyfits.setval(combfile,'JD',value=avgjd)
+    pyfits.setval(combfile,'JD',value=avgjd,comment='average of multiple exposures')
     print "average JD = " + str(avgjd)
     sumet = np.sum([pyfits.getval(f,'EXPTIME') for f in c1fs])
-    pyfits.setval(combfile,'EXPTIME',value=sumet)
+    pyfits.setval(combfile,'EXPTIME',value=sumet,comment='sum of multiple exposures')
     print "total EXPTIME = " + str(sumet)
     avgam = np.mean([pyfits.getval(f,'AIRMASS') for f in c1fs])
-    pyfits.setval(combfile,'AIRMASS',value=avgam)
+    pyfits.setval(combfile,'AIRMASS',value=avgam,comment='average of multiple exposures')
     print "avg AIRMASS = " + str(avgam)
+
+    # update this to used avg jd midpoint of all exposures? 
+    print "barycentric velocity correction (km/s) = ", 
+    iraf.bcvcorr(spectra=combfile,keytime='UTC-OBS',keywhen='mid',
+                 obslong="339:11:16.8",obslat="-32:22:46.2",obsalt='1798',obsname='saao', 
+                 savebcv='yes',savejd='yes',printmode=2)
+    pyfits.setval(combfile,'UTMID',comment='added by RVSAO task BCVCORR')
+    pyfits.setval(combfile,'GJDN',comment='added by RVSAO task BCVCORR')
+    pyfits.setval(combfile,'HJDN',comment='added by RVSAO task BCVCORR')
+    pyfits.setval(combfile,'BCV',comment='added by RVSAO task BCVCORR (km/s)')
+    pyfits.setval(combfile,'HCV',comment='added by RVSAO task BCVCORR (km/s)')
+    iraf.dopcor(input=combfile,output='',redshift=-iraf.bcvcorr.bcv,isvelocity='yes',
+                add='no',dispersion='yes',flux='no',verbose='yes')
+    pyfits.setval(combfile,'DOPCOR01',comment='barycentric velocity correction applied')
 
     iraf.cd('..')
 
@@ -949,8 +970,9 @@ def speccombine(fs=None):
 # These numbers were taken directly from Tom Matheson's Cal code from Jeff
 # Silverman
 #telluricWaves = {'B': (6855, 6935), 'A': (7590, 7685)}
-telluricWaves = [(2000., 3190.), (3216., 3420.), (5500., 6050.), (6250., 6360.),
-                 (6450., 6530.), (6840., 7410.), (7560., 8410.), (8800., 9900.)]
+#telluricWaves = [(2000., 3190.), (3216., 3420.), (5500., 6050.), (6250., 6360.),
+#                 (6450., 6530.), (6840., 7410.), (7560., 8410.), (8800., 9900.)]
+telluricWaves = [(6250., 6360.), (6450., 6530.), (6855., 7400.), (7580., 7720.)]
 
 
 def fitshdr_to_wave(hdr):
