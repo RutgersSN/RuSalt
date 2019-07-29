@@ -288,6 +288,41 @@ def get_chipgaps(hdu):
         chipgap2 = (np.min(w[w > 1750]) - 1, np.max(w[w < 2350]) + 1)
         # edge of chip 3=
         chipgap3 = (np.min(w[w > 2900]) - 1, hdu[2].data.shape[1] + 1)
+        
+        # In the case of fast reduction, the chip gaps will not be zero, but interpolated over instead.
+        # In which case it will only find one set of zeros, and the first two chipgaps will be equal.
+        # I am taking the derivatives of the spectra, and searching for the most common values of a constant slope.
+        if chipgap1==chipgap2:
+            dt = []
+            w = []
+            for i in d:
+                dt.append(np.diff(i))
+            for i in dt:
+                k = Counter(i).most_common(4)
+                if k[0][1]> 14:
+                    w.append(np.where(i==k[0][0]))
+                if k[1][1]> 12:
+                     w.append(np.where(i==k[1][0]))
+                if k[2][1]> 10:
+                    w.append(np.where(i==k[2][0]))
+                if k[3][1]> 8:
+                     w.append(np.where(i==k[3][0]))   
+        ### Not sure why it selects values less than 2000 at the moment
+        #print(w[w > 2000])
+        #print(np.min(w[(w > 2000)]))            
+	    ## Chip 1
+        #chipgap1 = (np.min(w[w > 700]) - 1, np.max(w[w < 1300]) + 1)
+        # Chip 2
+        #chipgap2 = (np.min(w[w > 1750]) - 1, np.max(w[w < 2350]) + 1)
+
+        #find the third chipgap at a delta of zeros
+        #w.append(np.where(dt==0))
+        # edge of chip 3=
+        #chipgap3 = (np.min(w[(w > 2900)]) - 1, hdu[2].data.shape[1] + 1)
+        try:
+            assert chipgap1 != chipgap2, "ERROR, Both chipgaps should not be equal"
+        except KeyboardInterrupt as e:
+            print(e)
         return (chipgap1, chipgap2, chipgap3)
 
 
